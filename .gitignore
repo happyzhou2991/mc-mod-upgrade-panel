@@ -1,0 +1,17 @@
+# 构建产物
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行时生成(含用户本地路径,不提交)
+output/
+mods_config.json
+mods_manifest.json
+
+# Claude Code
+.claude/
