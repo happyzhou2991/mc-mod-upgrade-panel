@@ -441,6 +441,20 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
                     mig_summary["skipped_mods"] = not_updated
         else:
             util.emit("[迁移] 未选择任何迁移项,只做 mod 升级。")
+        # 更新成功的资源包/光影:复制进新实例对应文件夹(与 mod 迁移独立)
+        for grp, pu in pack_updates.items():
+            if not opts.migrate_groups.get(grp):
+                continue
+            dest_grp = new_instance / grp
+            for r in pu["results"]:
+                if r.get("status") == "ok" and r.get("downloaded") \
+                        and r.get("dest_file"):
+                    srcp = out / grp / r["dest_file"]
+                    if not srcp.exists():
+                        continue
+                    dest_grp.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(srcp, dest_grp / r["dest_file"])
+                    util.emit(f"[迁移][{grp}] 更新包复制: {r['dest_file']}")
     elif cancelled_flag:
         util.emit("[已取消] 跳过迁移,仅保留已完成的下载。")
 
@@ -524,7 +538,7 @@ def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run):
             meta["not_found"].append(p.name)
             continue
         dest_name = util.sanitize_filename(file_["filename"])
-        dest = out / dest_name
+        dest = out / grp / dest_name      # 更新包下到独立子目录,不混进 mod 输出
         entry = {
             "status": "ok", "title": p.name, "old_file": p.name,
             "new_file": file_["filename"], "dest_file": dest_name,

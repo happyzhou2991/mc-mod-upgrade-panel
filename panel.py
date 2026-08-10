@@ -138,7 +138,7 @@ class PanelApp:
         self._row(f_dst, 0, "新实例文件夹", self.var_new_instance,
                   self._browse_new, "选中的内容(含 mod)会复制到这里;不填=只升级 mod、不迁移")
         self._row(f_dst, 1, "mod 输出目录", self.var_out, self._browse_out,
-                  "升级后的 mod 和报告放这里(不填会自动生成)")
+                  "升级后的 mod、更新包和报告放这里(不填会自动生成)")
 
         # 4. 日志与结果
         t4 = ttk.Frame(nb, padding=6)
@@ -219,6 +219,18 @@ class PanelApp:
         for w in (canvas, inner):
             w.bind("<MouseWheel>",
                    lambda e: canvas.yview_scroll(int(-e.delta / 120), "units"))
+        # 鼠标停在任意子控件(勾选框/说明文字)上时也能滚轮滚动:
+        # 全局监听滚轮,仅当指针落在本 canvas 屏幕矩形内才滚动它,不干扰其他页。
+        def _on_mousewheel(event):
+            try:
+                x0, y0 = canvas.winfo_rootx(), canvas.winfo_rooty()
+                inside = (x0 <= event.x_root <= x0 + canvas.winfo_width()
+                          and y0 <= event.y_root <= y0 + canvas.winfo_height())
+            except Exception:
+                return
+            if inside:
+                canvas.yview_scroll(int(-event.delta / 120), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
         canvas.bind("<Configure>",
                     lambda e: canvas.itemconfigure(wid, width=e.width))
         return inner
