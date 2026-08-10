@@ -19,15 +19,29 @@ SLEEP = 0.15            # 请求间延时,礼貌限速
 # 网络参数:默认值,可用 configure_network(cfg) 按配置覆盖
 API_TIMEOUT = 30         # API/JSON 请求超时(秒)
 DOWNLOAD_TIMEOUT = 60    # 下载单次读取超时(秒)
-DOWNLOAD_RETRIES = 2     # 下载失败后的重试次数(总尝试 = 重试 + 1)
+DOWNLOAD_RETRIES = 3     # 下载失败后的重试次数(总尝试 = 重试 + 1)
 
 # 全局取消标志:GUI 点"取消"时置位,网络循环据此尽快收尾
 _cancel = threading.Event()
 
+# HTTP opener:默认走系统/环境代理;配置里填了 http_proxy/https_proxy 则用显式代理
+_opener = None
+
+
+def _get_opener():
+    global _opener
+    if _opener is None:
+        _opener = urllib.request.build_opener()
+    return _opener
+
 
 def configure_network(cfg):
-    """从配置读取网络参数覆盖默认值(api_timeout/download_timeout/download_retries)。"""
-    global API_TIMEOUT, DOWNLOAD_TIMEOUT, DOWNLOAD_RETRIES
+    """从配置读取网络参数覆盖默认值。
+
+    可配键:api_timeout / download_timeout / download_retries;
+    以及 http_proxy / https_proxy(网络被墙、需走代理时填,如 http://127.0.0.1:7890)。
+    """
+    global API_TIMEOUT, DOWNLOAD_TIMEOUT, DOWNLOAD_RETRIES, _opener
     try:
         if cfg.get("api_timeout"):
             API_TIMEOUT = int(cfg["api_timeout"])
@@ -37,6 +51,12 @@ def configure_network(cfg):
             DOWNLOAD_RETRIES = int(cfg["download_retries"])
     except (TypeError, ValueError):
         pass
+    proxy = (cfg.get("http_proxy") or cfg.get("https_proxy") or "").strip()
+    if proxy:
+        _opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+    else:
+        _opener = None
 
 
 def cancel():
@@ -95,7 +115,7 @@ def http_json(url, retries=4, headers=None, timeout=None):
             return None
         req = urllib.request.Request(url, headers=req_headers)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with _get_opener().open(req, timeout=timeout) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             if e.code == 429:
@@ -134,7 +154,7 @@ def download_file(url, dest, expect_sha1=None, retries=None):
         aborted = False
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-            with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp, \
+            with _get_opener().open(req, timeout=DOWNLOAD_TIMEOUT) as resp, \
                     open(dest, "wb") as out:
                 try:
                     total = int(resp.headers.get("Content-Length") or 0) or None

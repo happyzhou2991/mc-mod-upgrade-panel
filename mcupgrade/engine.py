@@ -309,6 +309,7 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
     mod_selected: {mod文件名: 是否迁移},由面板第 3 页的 mod 自选传入。"""
     source_instance = Path(source_instance)
     out = Path(out)
+    new_instance = Path(new_instance) if new_instance else None
     if entries is None:
         entries = scan.classify_instance(source_instance)
     util.emit(f"[扫描] 实例目录 {source_instance} 共 {len(entries)} 个条目")

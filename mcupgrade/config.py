@@ -36,7 +36,9 @@ DEFAULT_CONFIG = {
     "manual_overrides": {},
     "api_timeout": 30,
     "download_timeout": 60,
-    "download_retries": 2,
+    "download_retries": 3,
+    "http_proxy": "",
+    "https_proxy": "",
 }
 
 

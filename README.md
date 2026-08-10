@@ -1,4 +1,4 @@
-# MC Mod Upgrade Panel (beta 0.5.3)
+# MC Mod Upgrade Panel (beta 0.7.4)
 
 Upgrade a Minecraft instance to a new version in one click (e.g. 26.1 → 26.2). Each mod is identified automatically and pulled from Modrinth at the target version; mods not found there fall back to a GitHub search by name (results need manual confirmation). User data — config, saves, resource packs, shader packs, etc. — can be migrated to the new instance by checking export groups.
 
@@ -86,6 +86,7 @@ Auto-generated next to the exe or script; editable by hand:
 | `api_timeout` | Timeout (seconds) for API/JSON requests, default 30 |
 | `download_timeout` | Read timeout (seconds) while downloading a file, default 60 |
 | `download_retries` | Retry count after a failed download (total attempts = retries + 1) |
+| `http_proxy` / `https_proxy` | Proxy for all requests, e.g. `http://127.0.0.1:7890`. Leave empty to use the system/environment proxy |
 
 ## Files
 
@@ -101,6 +102,7 @@ Auto-generated next to the exe or script; editable by hand:
 ## Notes
 
 - Requires network access to `api.modrinth.com`, `api.github.com`, and `github.com`
+- If downloads keep failing on a slow/blocked network (timeouts, `WinError 10054`), raise `download_retries` / `download_timeout` in `mods_config.json`, or set `http_proxy`/`https_proxy` when a proxy is required
 - The tool only handles mods; the game itself and the loader are handled by your launcher
 - GitHub matching is heuristic — double-check items flagged "confirm manually" before starting the game
 - Migration only copies; it never overwrites or deletes
