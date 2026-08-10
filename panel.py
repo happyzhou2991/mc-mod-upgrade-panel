@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-panel.py —— MC 模组升级面板(Tkinter 图形版,测试版)
+panel.py —— MC 模组升级面板(Tkinter 图形版,正式版)
 
 给其他人用:选旧实例 → 扫描分类 → 勾选迁移项 → 升级 → 看报告。
 引擎在 mcupgrade 包里,CLI 版见 mc_mod_upgrader.py。

@@ -2,4 +2,4 @@
 
 由 CLI(mc_mod_upgrader.py)和图形面板(panel.py)共用。
 """
-__version__ = "0.9.9-beta"
+__version__ = "1.0.0"

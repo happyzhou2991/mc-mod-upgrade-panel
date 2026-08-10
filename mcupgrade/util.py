@@ -13,7 +13,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-USER_AGENT = "mcupgrade/0.1-beta (local MC mod upgrade tool)"
+from . import __version__
+
+USER_AGENT = f"mcupgrade/{__version__} (local MC mod upgrade tool)"
 SLEEP = 0.15            # 请求间延时,礼貌限速
 
 # 网络参数:默认值,可用 configure_network(cfg) 按配置覆盖

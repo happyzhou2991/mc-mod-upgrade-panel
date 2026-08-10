@@ -1,4 +1,4 @@
-# MC Mod Upgrade Panel (beta 0.9.9)
+# MC Mod Upgrade Panel (1.0.0)
 
 Upgrade a Minecraft instance to a new version in one click (e.g. 26.1 → 26.2). Each mod is identified automatically and pulled from Modrinth at the target version; mods not found there fall back to a GitHub search by name (results need manual confirmation). User data — config, saves, resource packs, shader packs, etc. — can be migrated to the new instance by checking export groups.
 
