@@ -378,8 +378,11 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
                                    ("shaderpacks", "shaderpacks",
                                     opts.update_shaderpacks)):
         if flag:
+            # 更新包直接落到新实例对应文件夹;没填新实例时落到输出目录的子目录
+            dest_root = (new_instance / grp) if new_instance else (out / grp)
             r, m = _upgrade_packs(source_instance / folder_name, grp,
-                                  target, out, cfg, opts, dry_run)
+                                  target, out, cfg, opts, dry_run,
+                                  dest_root=dest_root)
             pack_updates[grp] = {"results": r, "meta": m}
 
     # ---- 迁移(按分组勾选 + 扫描动作;mod 按面板自选单独处理)----
@@ -441,20 +444,6 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
                     mig_summary["skipped_mods"] = not_updated
         else:
             util.emit("[迁移] 未选择任何迁移项,只做 mod 升级。")
-        # 更新成功的资源包/光影:复制进新实例对应文件夹(与 mod 迁移独立)
-        for grp, pu in pack_updates.items():
-            if not opts.migrate_groups.get(grp):
-                continue
-            dest_grp = new_instance / grp
-            for r in pu["results"]:
-                if r.get("status") == "ok" and r.get("downloaded") \
-                        and r.get("dest_file"):
-                    srcp = out / grp / r["dest_file"]
-                    if not srcp.exists():
-                        continue
-                    dest_grp.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(srcp, dest_grp / r["dest_file"])
-                    util.emit(f"[迁移][{grp}] 更新包复制: {r['dest_file']}")
     elif cancelled_flag:
         util.emit("[已取消] 跳过迁移,仅保留已完成的下载。")
 
@@ -490,13 +479,15 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
             "report": report_path, "meta": meta}
 
 
-def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run):
+def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run, dest_root=None):
     """资源包/光影文件夹里的 .zip 包在 Modrinth 上尝试更新。
     文件夹形式的包无法哈希识别,只迁移不更新。
-    返回 (results条目, meta摘要)。"""
+    更新包下载到 dest_root(应为新实例的 resourcepacks/shaderpacks 或
+    输出目录的子目录),避免混进 mod 输出。返回 (results条目, meta摘要)。"""
     folder = Path(folder)
     util.configure_network(cfg)          # 网络参数按配置覆盖
     label = scan.GROUP_LABEL.get(grp, grp)
+    dest_root = Path(dest_root) if dest_root else (Path(out) / grp)
     results, meta = [], {"updated": 0, "skipped": 0,
                          "not_found": [], "folder_packs": []}
     if not folder.is_dir():
@@ -538,7 +529,7 @@ def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run):
             meta["not_found"].append(p.name)
             continue
         dest_name = util.sanitize_filename(file_["filename"])
-        dest = out / grp / dest_name      # 更新包下到独立子目录,不混进 mod 输出
+        dest = dest_root / dest_name      # 落到新实例 resourcepacks/shaderpacks
         entry = {
             "status": "ok", "title": p.name, "old_file": p.name,
             "new_file": file_["filename"], "dest_file": dest_name,
