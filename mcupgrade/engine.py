@@ -396,15 +396,31 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
                 actions[e["name"]] = "migrate"
         selected_mods = ([n for n, on in (mod_selected or {}).items() if on]
                          if mod_selected is not None else [])
+        # 只迁移"已更新成功(或源jar已是最新目标版)"的 mod。未找到目标版本/
+        # 未更新成功的旧版 mod 版本不匹配,复制到新实例也跑不了 → 不迁移旧版。
+        if dry_run:
+            updated = {r["old_file"]: r["dest_file"] for r in results
+                       if r.get("status") == "ok"
+                       and r.get("old_file") and r.get("dest_file")}
+        else:
+            updated = {r["old_file"]: r["dest_file"] for r in results
+                       if r.get("status") == "ok" and r.get("downloaded")
+                       and r.get("old_file") and r.get("dest_file")}
+        migrate_mod_list = [n for n in selected_mods if n in updated]
+        not_updated = sorted(n for n in selected_mods if n not in updated)
         if actions or selected_mods:
             util.emit(f"[迁移] 选择 {len(actions)} 个文件夹/文件 + "
-                      f"{len(selected_mods)} 个 mod 迁移到 {new_instance}")
+                      f"{len(migrate_mod_list)} 个 mod 迁移到 {new_instance}")
+            if not_updated:
+                util.emit("[跳过] 未找到目标版本/未更新成功的 mod 不迁移旧版: " +
+                          "、".join(not_updated))
             if dry_run:
                 util.emit("[dry-run][迁移] 不会真的复制,以下将迁移: " +
-                          ", ".join(sorted(actions) + sorted(selected_mods)))
+                          ", ".join(sorted(actions) + sorted(migrate_mod_list)))
                 mig_summary = {"copied": 0, "skipped": 0,
-                               "migrated": sorted(actions) + sorted(selected_mods),
-                               "mods": sorted(selected_mods), "dry_run": True}
+                               "migrated": sorted(actions) + sorted(migrate_mod_list),
+                               "mods": sorted(migrate_mod_list), "dry_run": True,
+                               "skipped_mods": not_updated}
             else:
                 mig_summary = {"copied": 0, "skipped": 0, "migrated": [], "mods": []}
                 if actions:
@@ -413,18 +429,16 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
                     mig_summary["copied"] += part["copied"]
                     mig_summary["skipped"] += part["skipped"]
                     mig_summary["migrated"].extend(part["migrated"])
-                if selected_mods:
-                    # 旧文件名 -> out 里的新文件名(更新成功的才用新版)
-                    updated = {r["old_file"]: r["dest_file"] for r in results
-                               if r.get("status") == "ok" and r.get("downloaded")
-                               and r.get("old_file") and r.get("dest_file")}
+                if migrate_mod_list:
                     part = migrate.migrate_mods(
                         source_instance / "mods", out,
-                        new_instance / "mods", updated, selected_mods)
+                        new_instance / "mods", updated, migrate_mod_list)
                     mig_summary["copied"] += part["copied"]
                     mig_summary["skipped"] += part["skipped"]
                     mig_summary["migrated"].extend(part["migrated"])
                     mig_summary["mods"].extend(part["migrated"])
+                if not_updated:
+                    mig_summary["skipped_mods"] = not_updated
         else:
             util.emit("[迁移] 未选择任何迁移项,只做 mod 升级。")
     elif cancelled_flag:

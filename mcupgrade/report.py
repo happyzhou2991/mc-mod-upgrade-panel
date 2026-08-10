@@ -60,6 +60,11 @@ def build(results, meta):
     mig = meta.get("migration")
     if mig:
         L.append(f"- 📦 迁移: 复制 **{mig['copied']}** 项,跳过 **{mig['skipped']}** 项")
+        sm = mig.get("skipped_mods")
+        if sm:
+            shown = "、".join(sm[:10]) + ("…" if len(sm) > 10 else "")
+            L.append(f"- ⚠️ 未迁移的 mod(未找到目标版本/未更新,旧版不迁移): "
+                     f"**{len(sm)}** 个 — {shown}")
     L.append("")
 
     # 导出内容分组
