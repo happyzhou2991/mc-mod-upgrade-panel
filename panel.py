@@ -149,6 +149,9 @@ class PanelApp:
         bar.pack(side="bottom", fill="x", pady=4)
         self.btn_start = ttk.Button(bar, text="④ 开始升级", command=self._on_start)
         self.btn_start.pack(side="left")
+        self.btn_cancel = ttk.Button(bar, text="取消", state="disabled",
+                                     command=self._on_cancel)
+        self.btn_cancel.pack(side="left", padx=6)
         ttk.Label(bar, text=" 开始前请确认:旧实例✓ 目标版本✓ 第 3 页勾选✓",
                   foreground="#666").pack(side="left")
         self.btn_open = ttk.Button(bar, text="打开输出文件夹", state="disabled",
@@ -522,7 +525,9 @@ class PanelApp:
         config.save_config(self.cfg)
 
         self.running = True
+        util.reset_cancel()
         self.btn_start.config(state="disabled")
+        self.btn_cancel.config(state="normal")
         self.lbl_status.config(text="运行中…")
         self.log_put(f"== 开始: {folder} → MC {target} ==")
         args = dict(source_instance=folder, new_instance=new_instance,
@@ -569,10 +574,22 @@ class PanelApp:
         self.log.see("end")
         self.log.config(state="disabled")
 
+    def _on_cancel(self):
+        if not self.running:
+            return
+        util.cancel()
+        self.btn_cancel.config(state="disabled")
+        self.lbl_status.config(text="正在取消…")
+        self.log_put("⏹ 正在取消,等当前下载/请求中断后退出 …")
+
     def _on_done(self, result):
         self.running = False
         self.btn_start.config(state="normal")
-        self.lbl_status.config(text="完成")
+        self.btn_cancel.config(state="disabled")
+        cancelled = (result.get("meta") or {}).get("cancelled")
+        self.lbl_status.config(text="已取消" if cancelled else "完成")
+        if cancelled:
+            self.log_put("✋ 已取消:仅完成部分下载,报告仍已生成(内容为已完成部分)。")
         self.last_report = result["report"]
         self.btn_open.config(state="normal")
         self.btn_report.config(state="normal")
@@ -591,6 +608,7 @@ class PanelApp:
     def _on_error(self, err):
         self.running = False
         self.btn_start.config(state="normal")
+        self.btn_cancel.config(state="disabled")
         self.lbl_status.config(text="出错")
         self.log_put("[错误]\n" + str(err))
         messagebox.showerror("出错了", str(err)[:500])

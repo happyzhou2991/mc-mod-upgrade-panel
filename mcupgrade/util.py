@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -15,6 +15,43 @@ from pathlib import Path
 
 USER_AGENT = "mcupgrade/0.1-beta (local MC mod upgrade tool)"
 SLEEP = 0.15            # 请求间延时,礼貌限速
+
+# 网络参数:默认值,可用 configure_network(cfg) 按配置覆盖
+API_TIMEOUT = 30         # API/JSON 请求超时(秒)
+DOWNLOAD_TIMEOUT = 60    # 下载单次读取超时(秒)
+DOWNLOAD_RETRIES = 2     # 下载失败后的重试次数(总尝试 = 重试 + 1)
+
+# 全局取消标志:GUI 点"取消"时置位,网络循环据此尽快收尾
+_cancel = threading.Event()
+
+
+def configure_network(cfg):
+    """从配置读取网络参数覆盖默认值(api_timeout/download_timeout/download_retries)。"""
+    global API_TIMEOUT, DOWNLOAD_TIMEOUT, DOWNLOAD_RETRIES
+    try:
+        if cfg.get("api_timeout"):
+            API_TIMEOUT = int(cfg["api_timeout"])
+        if cfg.get("download_timeout"):
+            DOWNLOAD_TIMEOUT = int(cfg["download_timeout"])
+        if cfg.get("download_retries") is not None:
+            DOWNLOAD_RETRIES = int(cfg["download_retries"])
+    except (TypeError, ValueError):
+        pass
+
+
+def cancel():
+    """请求取消(可跨线程调用)。"""
+    _cancel.set()
+
+
+def reset_cancel():
+    """开始新一轮运行前清除取消标志。"""
+    _cancel.clear()
+
+
+def cancelled():
+    """是否已请求取消。"""
+    return _cancel.is_set()
 
 TAG_RE = re.compile(r"^(\[[^\[\]]*\]\s*)")        # 匹配并捕获 [中文名] 前缀
 INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -45,12 +82,17 @@ def utf8_console():
             pass
 
 
-def http_json(url, retries=4, headers=None, timeout=30):
+def http_json(url, retries=4, headers=None, timeout=None):
     """GET 请求返回 JSON;404/410 或最终失败返回 None。带 429 退避重试。"""
+    if timeout is None:
+        timeout = API_TIMEOUT
     req_headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
     if headers:
         req_headers.update(headers)
     for attempt in range(retries):
+        if cancelled():
+            emit("  [已取消]")
+            return None
         req = urllib.request.Request(url, headers=req_headers)
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -71,27 +113,79 @@ def http_json(url, retries=4, headers=None, timeout=30):
     return None
 
 
-def download_file(url, dest, expect_sha1=None, retries=2):
+def download_file(url, dest, expect_sha1=None, retries=None):
+    """下载文件到 dest,可校验 SHA1。返回 True/False。
+
+    下载中每 ~3 秒报一次进度(便于烂网下确认没卡死);读超时由
+    DOWNLOAD_TIMEOUT 控制;收到取消请求(util.cancel())会删掉
+    半成品文件并返回 False。
+    """
+    if retries is None:
+        retries = DOWNLOAD_RETRIES
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    for attempt in range(retries + 1):
+    attempts = retries + 1
+    for attempt in range(attempts):
+        if cancelled():
+            emit("  [已取消]")
+            dest.unlink(missing_ok=True)
+            return False
+        done = 0
+        aborted = False
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-            with urllib.request.urlopen(req, timeout=120) as resp, \
+            with urllib.request.urlopen(req, timeout=DOWNLOAD_TIMEOUT) as resp, \
                     open(dest, "wb") as out:
-                shutil.copyfileobj(resp, out, length=1 << 16)
+                try:
+                    total = int(resp.headers.get("Content-Length") or 0) or None
+                except (TypeError, ValueError):
+                    total = None
+                last_prog = time.monotonic() - 3     # 让第一条进度 3s 内出现
+                while True:
+                    if cancelled():
+                        emit("  [已取消]")
+                        aborted = True
+                        break
+                    chunk = resp.read(1 << 16)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    done += len(chunk)
+                    now = time.monotonic()
+                    if now - last_prog >= 3:
+                        last_prog = now
+                        emit(_progress_line(dest.name, done, total))
+            if aborted:
+                dest.unlink(missing_ok=True)
+                return False
             if expect_sha1 and sha1_of_file(dest).lower() != expect_sha1.lower():
-                emit(f"  [校验失败] {dest.name},SHA1 不匹配,重试 ...")
+                emit(f"  [校验失败] {dest.name}:SHA1 不匹配,第 {attempt + 1}/"
+                     f"{attempts} 次,重试 ...")
                 dest.unlink(missing_ok=True)
                 time.sleep(1)
                 continue
+            emit(f"  ✓ 下载完成 {done / 1e6:.1f} MB")
             return True
         except Exception as e:
             if attempt < retries:
-                time.sleep(1 + attempt * 2)
+                msg = f"  [下载中断] {dest.name}"
+                if done:
+                    msg += f":已下 {done / 1e6:.1f} MB"
+                msg += f",{e},第 {attempt + 1}/{attempts} 次,重试 ..."
+                emit(msg)
             else:
                 emit(f"  [下载失败] {dest.name}: {e}")
+            dest.unlink(missing_ok=True)
+            time.sleep(1 + attempt * 2)
     return False
+
+
+def _progress_line(name, done, total):
+    """下载进度的一行文本;total 为 None(无 Content-Length)时只报已下载量。"""
+    if total:
+        pct = done * 100 // total
+        return f"  ⏳ {name}:已下载 {done / 1e6:.1f}/{total / 1e6:.1f} MB ({pct}%)"
+    return f"  ⏳ {name}:已下载 {done / 1e6:.1f} MB"
 
 
 def sha1_of_file(path):

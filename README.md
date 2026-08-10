@@ -1,4 +1,4 @@
-# MC Mod Upgrade Panel (beta 0.4.1)
+# MC Mod Upgrade Panel (beta 0.5.3)
 
 Upgrade a Minecraft instance to a new version in one click (e.g. 26.1 → 26.2). Each mod is identified automatically and pulled from Modrinth at the target version; mods not found there fall back to a GitHub search by name (results need manual confirmation). User data — config, saves, resource packs, shader packs, etc. — can be migrated to the new instance by checking export groups.
 
@@ -12,6 +12,7 @@ Ships as a single exe for others to use; no Python installation required.
 - **Resource/shader packs** have their own "update or not" section: zip packs are checked against Modrinth for a newer version; folder-style packs are migrated only (never updated)
 - **Unknown entries** end up in an "Other folders" group where you tick each one to migrate
 - **Dry-run mode**: previews results without downloading or migrating
+- **Live download progress + Cancel**: slow downloads log MB/% every few seconds so the panel never looks frozen, and a **Cancel** button on the log page stops the run cleanly (a partial report is still written)
 - Each panel page shows a step banner so first-time users know what to do
 
 ## Run
@@ -32,7 +33,7 @@ Four tabs:
 | 1. Settings | Pick the old instance folder, target MC version, loader; optional "dry-run" mode. Step banner on top |
 | 2. Scan & Migrate | Scans the instance and lists every entry with its category; double-click a row to toggle Migrate / Ignore |
 | 3. Update Options | Tick mod update sources; a dedicated section for "update resource/shader packs or not"; tick each mod to migrate; tick export groups; fill in the new instance folder and mod output folder |
-| 4. Log & Results | Click "Start upgrade", watch the live log, then open the output folder / report |
+| 4. Log & Results | Click "Start upgrade", watch the live log (downloads show progress; Cancel stops the run), then open the output folder / report |
 
 Flow: pick instance → scan → tick migrate items (including per-mod selection) → start → read `report.md`.
 Ticked mods are copied into the new instance's `mods` folder automatically (updated version when available, otherwise the original jar).
@@ -82,6 +83,9 @@ Auto-generated next to the exe or script; editable by hand:
 | `prefer_stable` | Prefer release versions |
 | `excluded` | File names to skip, exact match |
 | `manual_overrides` | Manual download source, `{"file.jar": {"url": "...", "filename": "save-as.jar", "sha1": "optional"}}` |
+| `api_timeout` | Timeout (seconds) for API/JSON requests, default 30 |
+| `download_timeout` | Read timeout (seconds) while downloading a file, default 60 |
+| `download_retries` | Retry count after a failed download (total attempts = retries + 1) |
 
 ## Files
 

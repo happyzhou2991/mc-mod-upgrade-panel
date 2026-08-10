@@ -69,6 +69,7 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
     excluded 不传时用 cfg["excluded"];面板会把未勾选迁移的 mod 传进来排除更新。"""
     if excluded is None:
         excluded = cfg.get("excluded", [])
+    util.configure_network(cfg)          # 网络参数按配置覆盖(api/download 超时、重试)
     jars, disabled = scan_mods_folder(source, excluded)
     util.emit(f"[扫描] 共 {len(jars)} 个启用 mod,{len(disabled)} 个忽略(.disabled/排除)")
     if not jars:
@@ -79,6 +80,9 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
     identified, not_found = [], []
     util.emit("[识别] 通过 Modrinth 识别 mod 身份 ...")
     for i, jar in enumerate(jars, 1):
+        if util.cancelled():
+            util.emit("[已取消] 跳过剩余识别")
+            break
         util.emit(f"  ({i}/{len(jars)}) {jar.name[:60]}")
         info = sources.identify_mod(manifest, jar) if opts.use_modrinth else None
         if info is None:
@@ -98,6 +102,9 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
     projects = manifest.get("projects", {})
     total = len(seen)
     for idx, (pid, jar_list) in enumerate(seen.items(), 1):
+        if util.cancelled():
+            util.emit("[已取消] 跳过剩余 mod 更新")
+            break
         info = projects.get(pid, {})
         title = info.get("title") or pid
         slug = info.get("slug", "")
@@ -181,6 +188,9 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
     github_pending = []
     overrides = cfg.get("manual_overrides") or {}
     for jar in not_found:
+        if util.cancelled():
+            util.emit("[已取消] 跳过剩余未识别 mod")
+            break
         override = overrides.get(jar.name)
         if override and override.get("url"):
             _download_override(results, jar, override, target, cfg, opts, out,
@@ -327,8 +337,9 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
             pack_updates[grp] = {"results": r, "meta": m}
 
     # ---- 迁移(按分组勾选 + 扫描动作;mod 按面板自选单独处理)----
+    cancelled_flag = util.cancelled()
     mig_summary = None
-    if new_instance:
+    if new_instance and not cancelled_flag:
         actions = {}
         for e in entries:
             grp = e.get("group") or e.get("category")
@@ -370,6 +381,8 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
                     mig_summary["mods"].extend(part["migrated"])
         else:
             util.emit("[迁移] 未选择任何迁移项,只做 mod 升级。")
+    elif cancelled_flag:
+        util.emit("[已取消] 跳过迁移,仅保留已完成的下载。")
 
     # ---- 资源包/光影清单 ----
     rp_list = _list_names(source_instance / "resourcepacks")
@@ -396,6 +409,7 @@ def run(source_instance, new_instance, target, loader, out, cfg, opts,
         "migration": mig_summary, "scan_unknown": unknown,
         "groups": groups, "pack_updates": pack_updates,
         "enabled_groups": [g for g, v in opts.migrate_groups.items() if v],
+        "cancelled": bool(cancelled_flag),
     }
     report_path = report.write(results, meta, out)
     return {"results": results, "entries": entries, "migration": mig_summary,
@@ -407,6 +421,7 @@ def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run):
     文件夹形式的包无法哈希识别,只迁移不更新。
     返回 (results条目, meta摘要)。"""
     folder = Path(folder)
+    util.configure_network(cfg)          # 网络参数按配置覆盖
     label = scan.GROUP_LABEL.get(grp, grp)
     results, meta = [], {"updated": 0, "skipped": 0,
                          "not_found": [], "folder_packs": []}
@@ -423,6 +438,9 @@ def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run):
               f"{len(folder_packs)} 个文件夹形式(仅迁移)")
 
     for i, p in enumerate(packs, 1):
+        if util.cancelled():
+            util.emit(f"[已取消] 跳过剩余{label}")
+            break
         util.emit(f"  ({i}/{len(packs)}) {p.name[:60]}")
         info = sources.identify_mod(manifest, p)
         if info is None:

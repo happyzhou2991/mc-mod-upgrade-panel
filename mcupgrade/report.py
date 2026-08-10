@@ -44,6 +44,9 @@ def build(results, meta):
     L.append(f"- 来源: `{meta.get('source', '')}`")
     L.append(f"- 目标 MC 版本: `{target}`  加载器: `{meta.get('loader', '')}`")
     L.append(f"- 生成时间: {time.strftime('%Y-%m-%d %H:%M')}")
+    if meta.get("cancelled"):
+        L.append("")
+        L.append("> ⏹ **本次运行已取消**,仅完成部分下载;以下为已完成部分的结果。")
     L.append("")
     L.append("## 汇总")
     L.append("")

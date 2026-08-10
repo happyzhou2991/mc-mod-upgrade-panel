@@ -34,6 +34,9 @@ DEFAULT_CONFIG = {
     "update_shaderpacks": False,
     "excluded": [],
     "manual_overrides": {},
+    "api_timeout": 30,
+    "download_timeout": 60,
+    "download_retries": 2,
 }
 
 
