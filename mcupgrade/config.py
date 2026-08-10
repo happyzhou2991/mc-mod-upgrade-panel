@@ -39,6 +39,11 @@ DEFAULT_CONFIG = {
     "download_retries": 3,
     "http_proxy": "",
     "https_proxy": "",
+    "github_mirrors": [
+        "https://gh-proxy.com/",
+        "https://ghfast.top/",
+        "https://github.moeyy.xyz/",
+    ],
 }
 
 
@@ -69,7 +74,7 @@ def load_manifest():
             return json.loads(MANIFEST_FILE.read_text(encoding="utf-8-sig"))
         except Exception:
             pass
-    return {"by_filename": {}, "projects": {}, "github": {}}
+    return {"by_filename": {}, "projects": {}, "github": {}, "versions": {}}
 
 
 def save_manifest(manifest):

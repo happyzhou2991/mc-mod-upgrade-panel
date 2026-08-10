@@ -1,4 +1,4 @@
-# MC Mod Upgrade Panel (beta 0.7.4)
+# MC Mod Upgrade Panel (beta 0.9.4)
 
 Upgrade a Minecraft instance to a new version in one click (e.g. 26.1 → 26.2). Each mod is identified automatically and pulled from Modrinth at the target version; mods not found there fall back to a GitHub search by name (results need manual confirmation). User data — config, saves, resource packs, shader packs, etc. — can be migrated to the new instance by checking export groups.
 
@@ -13,6 +13,8 @@ Ships as a single exe for others to use; no Python installation required.
 - **Unknown entries** end up in an "Other folders" group where you tick each one to migrate
 - **Dry-run mode**: previews results without downloading or migrating
 - **Live download progress + Cancel**: slow downloads log MB/% every few seconds so the panel never looks frozen, and a **Cancel** button on the log page stops the run cleanly (a partial report is still written)
+- **Version-query caching**: target-version lookups are cached for 12 hours, so a rerun skips the network when files are already downloaded (no redundant timeouts on slow networks)
+- **GitHub mirror fallback**: if a GitHub download fails directly, it automatically retries through the configurable `github_mirrors` list
 - Each panel page shows a step banner so first-time users know what to do
 
 ## Run
@@ -87,6 +89,7 @@ Auto-generated next to the exe or script; editable by hand:
 | `download_timeout` | Read timeout (seconds) while downloading a file, default 60 |
 | `download_retries` | Retry count after a failed download (total attempts = retries + 1) |
 | `http_proxy` / `https_proxy` | Proxy for all requests, e.g. `http://127.0.0.1:7890`. Leave empty to use the system/environment proxy |
+| `github_mirrors` | List of GitHub download mirror prefixes tried after direct access fails (empty list = direct only) |
 
 ## Files
 

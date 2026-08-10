@@ -63,6 +63,24 @@ def scan_mods_folder(folder, excluded):
 
 
 # ---------------------------------------------------------------- mod 更新
+VERSION_TTL = 12 * 3600      # 版本查询缓存有效时长(秒):12h 内重跑不联网
+
+
+def _query_version_cached(manifest, pid, target, loader):
+    """带缓存的目标版本查询。12h 内命中缓存则直接复用,不再联网。
+
+    让"输出目录已有目标文件"的场景在重跑时不产生多余的 API 请求
+    (烂网上那类握手超时的 [网络错误] 就不会再出现)。"""
+    cache = manifest.setdefault("versions", {})
+    key = f"{pid}@{target}@{loader or ''}"
+    ent = cache.get(key)
+    if ent and time.time() - ent.get("fetched", 0) < VERSION_TTL:
+        return ent["data"]
+    data = sources.query_target_version(pid, target, loader)
+    cache[key] = {"data": data, "fetched": time.time()}
+    return data
+
+
 def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
                  excluded=None):
     """更新 mod:识别 → 查目标版本 → 下载到 out。返回 (results, disabled)。
@@ -113,7 +131,7 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
         dupes = [p.name for p in jar_list if p != primary_jar]
 
         util.emit(f"\n[{idx}/{total}] {title} ({slug})")
-        vers = sources.query_target_version(pid, target, loader)
+        vers = _query_version_cached(manifest, pid, target, loader)
         time.sleep(util.SLEEP)
         if opts.prefer_stable and vers:
             stable = [v for v in vers if v.get("version_type") == "release"]
@@ -227,7 +245,7 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
                 if dry_run:
                     util.emit(f"  [dry-run][GitHub] {new_filename} ← {g['repo']}")
                 else:
-                    ok = util.download_file(g["url"], dest)
+                    ok = _download_with_mirrors(g["url"], dest, cfg)
                     entry["downloaded"] = ok
                     if ok:
                         mc_dep, _ = util.read_fabric_depends(dest)
@@ -260,7 +278,25 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
             "note": "不在 Modrinth,需手动处理", "duplicates": [],
         })
 
+    config.save_manifest(manifest)     # 持久化识别 + 版本查询缓存(供下次运行免联网)
     return results, disabled, github_pending
+
+
+def _download_with_mirrors(url, dest, cfg):
+    """下载 GitHub 文件:先直连,失败后依次尝试配置里的镜像前缀。
+
+    每个候选最多 2 次尝试;第一个成功的候选即返回。列表可用
+    mods_config.json 的 github_mirrors 增删(留空=只用直连)。"""
+    mirrors = [m for m in (cfg.get("github_mirrors") or []) if m]
+    candidates = [url] + [m.rstrip("/") + "/" + url for m in mirrors]
+    for i, u in enumerate(candidates):
+        if i:
+            host = u.split("/")[2] if "//" in u else u[:40]
+            util.emit(f"  [GitHub 镜像] 尝试 {host}")
+        ok = util.download_file(u, dest, retries=1)
+        if ok or util.cancelled():
+            return ok
+    return False
 
 
 def _download_override(results, jar, override, target, cfg, opts, out, dry_run):
@@ -449,7 +485,7 @@ def _upgrade_packs(folder, grp, target, out, cfg, opts, dry_run):
             util.emit("    未在 Modrinth 找到,保留原包")
             continue
         pid = info["project_id"]
-        vers = sources.query_target_version(pid, target, None)
+        vers = _query_version_cached(manifest, pid, target, None)
         time.sleep(util.SLEEP)
         if opts.prefer_stable and vers:
             stable = [v for v in vers if v.get("version_type") == "release"]
