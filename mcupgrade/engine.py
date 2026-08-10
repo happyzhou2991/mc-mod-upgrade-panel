@@ -7,6 +7,7 @@ CLI 与 GUI 共用:
 """
 from __future__ import annotations
 
+import shutil
 import time
 import urllib.parse
 from pathlib import Path
@@ -189,6 +190,14 @@ def upgrade_mods(source, target, loader, out, cfg, opts, dry_run=False,
                     util.sha1_of_file(dest).lower() == expect_sha1.lower():
                 util.emit(f"  [已存在] {dest_name}(版本一致,跳过下载)")
                 entry["downloaded"] = True
+            elif expect_sha1 and \
+                    util.sha1_of_file(primary_jar).lower() == expect_sha1.lower():
+                # 源 mod 已是最新目标版本:本地复制到输出目录,不联网
+                util.emit(f"  [已就绪] 源 mod 已是目标版本,本地复用 {dest_name}")
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(primary_jar, dest)
+                entry["downloaded"] = True
+                entry["note"] = "源 mod 已是目标版本,本地复用"
             else:
                 util.emit(f"  [下载] {dest_name}")
                 ok = util.download_file(entry["download_url"], dest, expect_sha1)
