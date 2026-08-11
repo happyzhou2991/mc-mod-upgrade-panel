@@ -245,7 +245,24 @@ def print_summary(results):
     nov = [r for r in results if r["status"] == "no_version"]
     nf = [r for r in results if r["status"] == "not_found"]
     dlf = [r for r in results if r["status"] == "download_failed"]
+
+    def _names(items, prefix="  "):
+        names = [(r.get("tag", "") + r.get("title", "")).strip()
+                 or r.get("old_file", "") for r in items]
+        shown = "、".join(names[:10])
+        if len(names) > 10:
+            shown += f"…(共 {len(names)} 个)"
+        return (prefix + "• " + shown) if shown else ""
+
     print(f"  ✅ 已更新/已就绪      : {len(ok)}")
+    if ok:
+        print(_names(ok))
     print(f"  ⚠️ 无目标版本         : {len(nov)}")
+    if nov:
+        print(_names(nov))
     print(f"  ❌ 需手动处理         : {len(nf)}")
+    if nf:
+        print(_names(nf))
     print(f"  💥 下载失败           : {len(dlf)}")
+    if dlf:
+        print(_names(dlf))

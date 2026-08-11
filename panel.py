@@ -616,6 +616,127 @@ class PanelApp:
         if mig:
             self.log_put(f"📦 迁移: 复制 {mig['copied']} 项,跳过 {mig['skipped']} 项")
         self.log_put(f"📄 报告: {result['report']}")
+        self.log_put("   (每个 mod 的具体结果已弹出窗口,关掉即可)")
+        self._show_result_window(result)
+
+    # ------------------------------------------------------------ 结果窗口
+    def _result_summary_text(self, result):
+        """把升级结果组织成分类清单(供结果窗口展示,只列结果不啰嗦)。"""
+        r = result.get("results", [])
+        meta = result.get("meta", {})
+        target = meta.get("target", "")
+        L = [f"本次目标:把 mod 升到 MC {target} 版", ""]
+
+        # GitHub 自动匹配的单独归到 🤖 栏,不混进"已更新"
+        ok = [x for x in r if x["status"] == "ok"
+              and not str(x.get("slug", "")).startswith("github:")]
+        nov = [x for x in r if x["status"] == "no_version"]
+        nf = [x for x in r if x["status"] == "not_found"]
+        dlf = [x for x in r if x["status"] == "download_failed"]
+
+        if not r:
+            L.append("没有需要处理的 mod。")
+
+        if ok:
+            L.append(f"✅ 已更新 / 已就绪({len(ok)})")
+            for x in ok:
+                name = (x.get("tag", "") + x.get("title", "")).strip() \
+                    or x.get("old_file", "")
+                if x.get("note") == "源 mod 已是目标版本,本地复用":
+                    L.append(f"  • {name}(本地已是最新版本)")
+                else:
+                    ver = x.get("new_version", "")
+                    L.append(f"  • {name} → 新版 {ver}" if ver else f"  • {name}")
+            L.append("")
+
+        if nov:
+            L.append(f"⚠️ 没有 MC {target} 的版本({len(nov)})")
+            for x in nov:
+                name = (x.get("tag", "") + x.get("title", "")).strip() \
+                    or x.get("old_file", "")
+                L.append(f"  • {name}——{x.get('note', '')}")
+            L.append("")
+
+        if nf:
+            L.append(f"❌ 自动找不到新版({len(nf)})")
+            for x in nf:
+                name = x.get("title", "") or x.get("old_file", "")
+                L.append(f"  • {name}——{x.get('note', '')}")
+            L.append("")
+
+        if dlf:
+            L.append(f"💥 下载失败({len(dlf)})")
+            for x in dlf:
+                name = (x.get("tag", "") + x.get("title", "")).strip() \
+                    or x.get("old_file", "")
+                L.append(f"  • {name}——{x.get('note', '')}")
+            L.append("")
+
+        mig = result.get("migration")
+        if mig:
+            L.append(f"📦 已迁移到新实例 —— 复制 {mig.get('copied', 0)} 项,"
+                     f"跳过 {mig.get('skipped', 0)} 项")
+            m_mods = mig.get("mods") or []
+            others = [n for n in (mig.get("migrated") or []) if n not in m_mods]
+            if m_mods:
+                L.append(f"  • 模组({len(m_mods)}):" + "、".join(m_mods))
+            if others:
+                L.append(f"  • 文件夹/配置({len(others)}):" + "、".join(others))
+            sm = mig.get("skipped_mods") or []
+            if sm:
+                L.append("")
+                L.append(f"⏭ 没迁到新实例的 mod({len(sm)})")
+                L.append("  • " + "、".join(sm))
+            L.append("")
+
+        gp = meta.get("github_pending", [])
+        if gp:
+            L.append(f"🤖 GitHub 按名字自动匹配({len(gp)})")
+            for g in gp:
+                L.append(f"  • {g['old']} ← 仓库 {g['repo']}")
+            L.append("")
+
+        dis = meta.get("disabled", [])
+        if dis:
+            L.append(f"🔒 忽略的({len(dis)})")
+            L.append("  • " + "、".join(dis))
+            L.append("")
+
+        pu = meta.get("pack_updates", {})
+        for grp, val in pu.items():
+            label = "资源包" if grp == "resourcepacks" else "光影"
+            m = val.get("meta", {})
+            if val.get("results"):
+                L.append(f"🎨 {label}:更新 {m.get('updated', 0)} 个,"
+                         f"没找到新版 {len(m.get('not_found', []))} 个")
+                for x in val.get("results", []):
+                    if x.get("status") == "ok":
+                        L.append(f"  • {x.get('old_file', '')} → "
+                                 f"{x.get('new_file', '')}")
+                L.append("")
+
+        return "\n".join(L)
+
+    def _show_result_window(self, result):
+        """升级完成后弹出一个小白友好结果窗口(不阻塞,可关掉)。"""
+        text = self._result_summary_text(result)
+        if self.var_dryrun.get():
+            text = "【演练模式:只是预览,不会真的下载/迁移】\n\n" + text
+        win = tk.Toplevel(self.root)
+        win.title("升级结果")
+        win.geometry("680x560")
+        win.transient(self.root)
+        frame = ttk.Frame(win)
+        frame.pack(fill="both", expand=True, padx=10, pady=(10, 4))
+        t = tk.Text(frame, wrap="word", font=("Microsoft YaHei UI", 10),
+                    padx=12, pady=8)
+        vs = ttk.Scrollbar(frame, orient="vertical", command=t.yview)
+        t.configure(yscrollcommand=vs.set)
+        t.pack(side="left", fill="both", expand=True)
+        vs.pack(side="right", fill="y")
+        t.insert("1.0", text)
+        t.config(state="disabled")
+        ttk.Button(win, text="知道了", command=win.destroy).pack(pady=(0, 10))
 
     def _on_error(self, err):
         self.running = False

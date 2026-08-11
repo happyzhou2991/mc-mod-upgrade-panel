@@ -1,4 +1,4 @@
-# MC Mod Upgrade Panel (1.0.0)
+# MC Mod Upgrade Panel (1.0.1)
 
 Upgrade a Minecraft instance to a new version in one click (e.g. 26.1 → 26.2). Each mod is identified automatically and pulled from Modrinth at the target version; mods not found there fall back to a GitHub search by name (results need manual confirmation). User data — config, saves, resource packs, shader packs, etc. — can be migrated to the new instance by checking export groups.
 
@@ -12,6 +12,7 @@ Ships as a single exe for others to use; no Python installation required.
 - **Resource/shader packs** have their own "update or not" section: zip packs are checked against Modrinth for a newer version; folder-style packs are migrated only (never updated)
 - **Unknown entries** end up in an "Other folders" group where you tick each one to migrate
 - **Dry-run mode**: previews results without downloading or migrating
+- **Plain-language result window**: after the run a pop-up window lists per category which mods were updated, which have no target version, which were not found, which failed to download, and which were migrated — no need to read the log
 - **Live download progress + Cancel**: slow downloads log MB/% every few seconds so the panel never looks frozen, and a **Cancel** button on the log page stops the run cleanly (a partial report is still written)
 - **Version-query caching**: target-version lookups are cached for 12 hours, so a rerun skips the network when files are already downloaded (no redundant timeouts on slow networks)
 - **Source already at target version**: if the old mod is already the newest for the target version, it is copied locally to the output folder instead of downloaded again
