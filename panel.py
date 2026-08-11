@@ -35,9 +35,123 @@ class PanelApp:
         self.running = False
         self.last_report = None
         util.set_message_handler(self.q.put)
+        self._setup_style(root)
         self._build_ui()
         self._load_defaults()
         root.after(120, self._drain)
+
+    # ------------------------------------------------------------ 主题
+    C = {
+        "bg": "#f3f4f6", "card": "#ffffff", "border": "#d8dde3",
+        "text": "#1f2937", "muted": "#6b7280",
+        "accent": "#2e9e5b", "accent_dark": "#25854c",
+        "accent_bg": "#e8f4ec", "accent_line": "#b7dfc4",
+        "tab_bg": "#e7eaee", "sel_bg": "#dcefe4", "sel_text": "#14532d",
+        "font": "Microsoft YaHei UI",
+    }
+
+    def _setup_style(self, root):
+        """全局配色:浅灰底 + 草绿强调,MC 清爽风。"""
+        c = self.C
+        style = ttk.Style(root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        F = c["font"]
+        style.configure(".", background=c["bg"], foreground=c["text"],
+                        font=(F, 10))
+        style.configure("TFrame", background=c["bg"])
+        style.configure("TLabel", background=c["bg"], foreground=c["text"])
+        style.configure("Card.TLabel", background=c["card"], foreground=c["text"])
+
+        style.configure("TLabelframe", background=c["card"],
+                        bordercolor=c["border"], relief="flat",
+                        borderwidth=1, padding=8)
+        style.configure("TLabelframe.Label", background=c["card"],
+                        foreground=c["accent_dark"], font=(F, 10, "bold"))
+
+        style.configure("Banner.TLabelframe", background=c["accent_bg"],
+                        bordercolor=c["accent_line"], relief="flat",
+                        borderwidth=1, padding=8)
+        style.configure("Banner.TLabel", background=c["accent_bg"],
+                        foreground=c["accent_dark"], font=(F, 11, "bold"))
+        style.configure("Banner.Sub.TLabel", background=c["accent_bg"],
+                        foreground="#45514b")
+
+        style.configure("TNotebook", background=c["bg"], borderwidth=0)
+        style.configure("TNotebook.Tab", background=c["tab_bg"],
+                        foreground="#3a414c", padding=(16, 8), font=(F, 10))
+        style.map("TNotebook.Tab",
+                  background=[("selected", c["accent"])],
+                  foreground=[("selected", "#ffffff")])
+
+        style.configure("TButton", background=c["card"], foreground=c["text"],
+                        bordercolor=c["border"], padding=(14, 6),
+                        font=(F, 10), relief="flat")
+        style.map("TButton",
+                  background=[("active", "#eef1f4"), ("pressed", "#e2e6ea")],
+                  bordercolor=[("active", c["accent"]), ("pressed", c["accent"])],
+                  focuscolor=[])
+
+        style.configure("Accent.TButton", background=c["accent"],
+                        foreground="#ffffff", bordercolor=c["accent"],
+                        padding=(18, 7), font=(F, 10, "bold"), relief="flat")
+        style.map("Accent.TButton",
+                  background=[("active", c["accent_dark"]),
+                              ("pressed", c["accent_dark"]),
+                              ("disabled", "#9cc6ad")],
+                  foreground=[("disabled", "#ffffff")],
+                  bordercolor=[("active", c["accent_dark"])])
+
+        style.configure("Quiet.TButton", background=c["bg"], foreground=c["muted"],
+                        bordercolor=c["border"], padding=(12, 6))
+        style.map("Quiet.TButton",
+                  background=[("active", "#e8eae6")],
+                  foreground=[("disabled", "#b9bec6")],
+                  bordercolor=[("active", c["accent_line"])])
+
+        style.configure("TCheckbutton", background=c["bg"], foreground=c["text"],
+                        font=(F, 10), padding=(4, 2))
+        style.map("TCheckbutton", background=[("active", c["bg"])],
+                  indicatorcolor=[("selected", c["accent"])])
+        style.configure("Card.TCheckbutton", background=c["card"])
+        style.map("Card.TCheckbutton", background=[("active", c["card"])],
+                  indicatorcolor=[("selected", c["accent"])])
+        style.configure("Banner.TCheckbutton", background=c["accent_bg"])
+        style.map("Banner.TCheckbutton", background=[("active", c["accent_bg"])],
+                  indicatorcolor=[("selected", c["accent"])])
+
+        style.configure("TEntry", fieldbackground=c["card"], foreground=c["text"],
+                        bordercolor=c["border"], insertcolor=c["text"], padding=4)
+        style.map("TEntry", bordercolor=[("focus", c["accent"])])
+
+        style.configure("TCombobox", fieldbackground=c["card"], foreground=c["text"],
+                        background=c["card"], arrowcolor=c["muted"],
+                        bordercolor=c["border"], padding=4)
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", c["card"])],
+                  selectbackground=[("readonly", c["card"])],
+                  selectforeground=[("readonly", c["text"])],
+                  bordercolor=[("focus", c["accent"])])
+
+        style.configure("Treeview", background=c["card"], fieldbackground=c["card"],
+                        foreground=c["text"], bordercolor=c["border"], rowheight=26)
+        style.map("Treeview", background=[("selected", c["sel_bg"])],
+                  foreground=[("selected", c["sel_text"])])
+        style.configure("Treeview.Heading", background="#eef1f4",
+                        foreground=c["text"], font=(F, 10, "bold"),
+                        borderwidth=0, relief="flat", padding=4)
+        style.map("Treeview.Heading", background=[("active", "#e2e6ea")])
+
+        style.configure("Vertical.TScrollbar", background="#cbd3dc",
+                        troughcolor=c["bg"], bordercolor=c["bg"],
+                        arrowcolor=c["muted"], relief="flat", width=12)
+        style.map("Vertical.TScrollbar", background=[("active", "#aab4bf")])
+
+        root.configure(bg=c["bg"])
+        root.option_add("*TCombobox*Listbox.background", c["card"])
+        root.option_add("*TCombobox*Listbox.foreground", c["text"])
 
     # ------------------------------------------------------------ UI
     def _build_ui(self):
@@ -50,12 +164,12 @@ class PanelApp:
         # 1. 设置
         t1 = ttk.Frame(nb, padding=10)
         nb.add(t1, text=" 1. 设置 ")
-        guide = ttk.LabelFrame(t1, padding=6)
+        guide = ttk.LabelFrame(t1, style="Banner.TLabelframe", padding=8)
         guide.grid(row=0, column=0, columnspan=4, sticky="we", pady=(0, 8))
         ttk.Label(guide, text="三步完成升级:① 填信息 → ② 扫描 → ③ 勾选更新/迁移项 → ④ 开始",
-                  font=("", 10, "bold"), foreground="#1a6b1a").pack(anchor="w")
+                  style="Banner.TLabel").pack(anchor="w")
         ttk.Label(guide, text="第一次用:只填「旧实例文件夹」,其余保持默认,点「扫描实例文件夹」即可。",
-                  foreground="#555").pack(anchor="w")
+                  style="Banner.Sub.TLabel").pack(anchor="w")
         self.var_instance = tk.StringVar()
         self.var_target = tk.StringVar(value="26.2")
         self.var_loader = tk.StringVar(value="fabric")
@@ -111,20 +225,25 @@ class PanelApp:
         self._guide(t3, "第三步:勾选更新与迁移项,填好目标,再去第 4 页开始",
                     "通常保持默认:模组全选、Modrinth 勾选、导出内容全选,再填「新实例文件夹」。")
 
-        f_src = ttk.LabelFrame(t3, text="mod 更新来源", padding=6)
+        f_src = ttk.LabelFrame(t3, text="mod 更新来源")
         f_src.pack(fill="x")
         ttk.Checkbutton(f_src, text="Modrinth 自动更新(推荐,能按哈希精准识别)",
+                        style="Card.TCheckbutton",
                         variable=self.var_mr).pack(anchor="w")
         ttk.Checkbutton(f_src, text="GitHub 自动搜索(Modrinth 找不到时,结果需人工确认)",
+                        style="Card.TCheckbutton",
                         variable=self.var_gh).pack(anchor="w")
 
-        f_pack = ttk.LabelFrame(t3, text="资源包 / 光影 是否更新(可选)", padding=6)
+        f_pack = ttk.LabelFrame(t3, text="资源包 / 光影 是否更新(可选)")
         f_pack.pack(fill="x", pady=(6, 0))
         ttk.Checkbutton(f_pack, text="更新资源包:在 Modrinth 上查找新版 zip",
+                        style="Card.TCheckbutton",
                         variable=self.var_up_rp).pack(anchor="w")
         ttk.Checkbutton(f_pack, text="更新光影包:在 Modrinth 上查找新版 zip",
+                        style="Card.TCheckbutton",
                         variable=self.var_up_sp).pack(anchor="w")
-        ttk.Label(f_pack, text="只对 zip 格式的包生效;文件夹形式的资源包/光影只会迁移、不会更新。",
+        ttk.Label(f_pack, style="Card.TLabel",
+                  text="只对 zip 格式的包生效;文件夹形式的资源包/光影只会迁移、不会更新。",
                   foreground="#888").pack(anchor="w")
 
         self.groups_frame = ttk.LabelFrame(
@@ -133,12 +252,14 @@ class PanelApp:
         self.groups_inner = None
         self._groups_hint()
 
-        f_dst = ttk.LabelFrame(t3, text="目标", padding=6)
+        f_dst = ttk.LabelFrame(t3, text="目标")
         f_dst.pack(fill="x")
         self._row(f_dst, 0, "新实例文件夹", self.var_new_instance,
-                  self._browse_new, "选中的内容(含 mod)会复制到这里;不填=只升级 mod、不迁移")
+                  self._browse_new, "选中的内容(含 mod)会复制到这里;不填=只升级 mod、不迁移",
+                  in_card=True)
         self._row(f_dst, 1, "mod 输出目录", self.var_out, self._browse_out,
-                  "升级后的 mod、更新包和报告放这里(不填会自动生成)")
+                  "升级后的 mod、更新包和报告放这里(不填会自动生成)",
+                  in_card=True)
 
         # 4. 日志与结果
         t4 = ttk.Frame(nb, padding=6)
@@ -147,10 +268,11 @@ class PanelApp:
                     "升级会联网下载新 mod,请保持网络畅通;完成后可打开输出文件夹和报告。")
         bar = ttk.Frame(t4)
         bar.pack(side="bottom", fill="x", pady=4)
-        self.btn_start = ttk.Button(bar, text="④ 开始升级", command=self._on_start)
+        self.btn_start = ttk.Button(bar, text="④ 开始升级", style="Accent.TButton",
+                                    command=self._on_start)
         self.btn_start.pack(side="left")
-        self.btn_cancel = ttk.Button(bar, text="取消", state="disabled",
-                                     command=self._on_cancel)
+        self.btn_cancel = ttk.Button(bar, text="取消", style="Quiet.TButton",
+                                     state="disabled", command=self._on_cancel)
         self.btn_cancel.pack(side="left", padx=6)
         ttk.Label(bar, text=" 开始前请确认:旧实例✓ 目标版本✓ 第 3 页勾选✓",
                   foreground="#666").pack(side="left")
@@ -163,21 +285,27 @@ class PanelApp:
         self.lbl_status = ttk.Label(bar, text="", foreground="#555")
         self.lbl_status.pack(side="right")
         self.log = tk.Text(t4, height=16, state="disabled", wrap="word",
-                           font=("Microsoft YaHei UI", 9))
+                           bg=self.C["card"], fg=self.C["text"],
+                           insertbackground=self.C["text"],
+                           font=(self.C["font"], 9),
+                           highlightthickness=0, relief="flat",
+                           padx=8, pady=6)
         log_sb = ttk.Scrollbar(t4, orient="vertical", command=self.log.yview)
         self.log.configure(yscrollcommand=log_sb.set)
         self.log.pack(side="left", fill="both", expand=True)
         log_sb.pack(side="right", fill="y")
 
-    def _row(self, parent, row, label, var, browse_cmd, hint):
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=3)
+    def _row(self, parent, row, label, var, browse_cmd, hint, in_card=False):
+        ls = "Card.TLabel" if in_card else "TLabel"
+        ttk.Label(parent, text=label, style=ls).grid(row=row, column=0,
+                                                      sticky="w", pady=3)
         e = ttk.Entry(parent, textvariable=var)
         e.grid(row=row, column=1, sticky="we", padx=4)
         if browse_cmd:
             ttk.Button(parent, text="浏览", command=browse_cmd).grid(
                 row=row, column=2, sticky="w")
         if hint:
-            ttk.Label(parent, text=hint, foreground="#888").grid(
+            ttk.Label(parent, text=hint, foreground="#888", style=ls).grid(
                 row=row, column=3, sticky="w", padx=6)
         parent.columnconfigure(1, weight=1)
 
@@ -188,11 +316,10 @@ class PanelApp:
 
     def _guide(self, parent, title, sub):
         """页面顶部的引导横幅(用于 pack 布局的页面)。"""
-        box = ttk.LabelFrame(parent, padding=6)
+        box = ttk.LabelFrame(parent, style="Banner.TLabelframe", padding=8)
         box.pack(fill="x", pady=(0, 8))
-        ttk.Label(box, text=title, font=("", 10, "bold"),
-                  foreground="#1a6b1a").pack(anchor="w")
-        ttk.Label(box, text=sub, foreground="#555").pack(anchor="w")
+        ttk.Label(box, text=title, style="Banner.TLabel").pack(anchor="w")
+        ttk.Label(box, text=sub, style="Banner.Sub.TLabel").pack(anchor="w")
         return box
 
     # ------------------------------------------------------------ 导出内容分组
@@ -200,6 +327,7 @@ class PanelApp:
         self.groups_inner = None
         ttk.Label(self.groups_frame,
                   text="先在第 1 页扫描实例,这里会列出能导出/迁移的内容分组。",
+                  style="Card.TLabel",
                   foreground="#666").pack(anchor="w", pady=8)
 
     def _make_scroll(self, parent):
@@ -207,9 +335,10 @@ class PanelApp:
 
         height=1:让 canvas 只请求 1px 高,实际高度由父容器 expand 分配。
         否则 canvas 默认请求 ~265px,会把同页其他固定内容(如『目标』栏)挤到看不见。"""
-        canvas = tk.Canvas(parent, highlightthickness=0, height=1)
+        canvas = tk.Canvas(parent, highlightthickness=0, height=1,
+                           bg=self.C["card"])
         vs = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
-        inner = ttk.Frame(canvas)
+        inner = ttk.Frame(canvas, style="Card.TFrame")
         inner.bind("<Configure>",
                    lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         wid = canvas.create_window((0, 0), window=inner, anchor="nw")
@@ -258,7 +387,7 @@ class PanelApp:
             e_list = grouped.get(key)
             if not e_list or key == "ignore":
                 continue
-            gf = ttk.Frame(inner)
+            gf = ttk.Frame(inner, style="Card.TFrame")
             gf.pack(fill="x", anchor="w", pady=2)
             if key == "mods":
                 self._build_mods_group(gf, label)
@@ -268,8 +397,10 @@ class PanelApp:
                 var = tk.BooleanVar(value=default)
                 self.group_vars[key] = var
                 ttk.Checkbutton(gf, text=f"{label} · {desc}",
+                                style="Card.TCheckbutton",
                                 variable=var).pack(anchor="w")
-                ttk.Label(gf, foreground="#666", wraplength=560,
+                ttk.Label(gf, style="Card.TLabel", foreground="#666",
+                          wraplength=560,
                           text="    包含: " + "、".join(e["name"] for e in e_list)
                           ).pack(anchor="w")
 
@@ -278,6 +409,7 @@ class PanelApp:
         master = tk.BooleanVar(value=False)
         self.group_vars["other"] = master
         ttk.Checkbutton(parent, text=f"{label} · 无法识别,逐个勾选要迁移的",
+                        style="Card.TCheckbutton",
                         variable=master,
                         command=lambda: self._toggle_all_other(master)
                         ).pack(anchor="w")
@@ -287,6 +419,7 @@ class PanelApp:
             e["action"] = "ignore"          # 默认不迁移
             name_txt = e["name"] + ("/" if e["is_dir"] else "")
             ttk.Checkbutton(parent, text="    " + name_txt, variable=v,
+                            style="Card.TCheckbutton",
                             command=lambda n=e["name"], vv=v: self._set_other(n, vv)
                             ).pack(anchor="w")
             self._refresh_tree_row(e["name"])
@@ -296,11 +429,12 @@ class PanelApp:
         master = tk.BooleanVar(value=True)
         self.group_vars["mods"] = master
         ttk.Checkbutton(parent, text=f"{label} · 勾选=迁移到新实例,取消=不迁移",
+                        style="Card.TCheckbutton",
                         variable=master,
                         command=lambda: self._toggle_all_mods(master)
                         ).pack(anchor="w")
         if not self.mod_selected:
-            ttk.Label(parent, foreground="#888",
+            ttk.Label(parent, style="Card.TLabel", foreground="#888",
                       text="    没找到旧实例的 mods 文件夹,或里面没有 mod。"
                       ).pack(anchor="w")
             return
@@ -308,9 +442,10 @@ class PanelApp:
             v = tk.BooleanVar(value=self.mod_selected[name])
             self.mod_vars[name] = v
             ttk.Checkbutton(parent, text="    " + name, variable=v,
+                            style="Card.TCheckbutton",
                             command=lambda n=name, vv=v: self._set_mod(n, vv)
                             ).pack(anchor="w")
-        ttk.Label(parent, foreground="#888", wraplength=560,
+        ttk.Label(parent, style="Card.TLabel", foreground="#888", wraplength=560,
                   text="    勾选的 mod 会更新并复制到新实例 mods 文件夹;"
                        "取消勾选则既不更新也不复制。"
                   ).pack(anchor="w")
@@ -726,9 +861,13 @@ class PanelApp:
         win.title("升级结果")
         win.geometry("680x560")
         win.transient(self.root)
+        win.configure(bg=self.C["bg"])
         frame = ttk.Frame(win)
         frame.pack(fill="both", expand=True, padx=10, pady=(10, 4))
-        t = tk.Text(frame, wrap="word", font=("Microsoft YaHei UI", 10),
+        t = tk.Text(frame, wrap="word", font=(self.C["font"], 10),
+                    bg=self.C["card"], fg=self.C["text"],
+                    insertbackground=self.C["text"],
+                    highlightthickness=0, relief="flat",
                     padx=12, pady=8)
         vs = ttk.Scrollbar(frame, orient="vertical", command=t.yview)
         t.configure(yscrollcommand=vs.set)
